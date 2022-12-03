@@ -1,24 +1,31 @@
-fn main() {
-    let input = std::fs::read_to_string("src/input.txt").unwrap();
+use itertools::Itertools;
+
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
+    let input = include_str!("input.txt").to_string();
     let solution = solve(input);
-    let max_three = &solution[solution.len() - 3..];
-    println!("{:?}\nsum: {}", max_three, max_three.iter().sum::<i32>());
+    let max_three = &solution[..3];
+    println!("{:?}\nsum: {}", max_three, max_three.iter().sum::<u64>());
+
+    Ok(())
 }
 
-fn solve(input: String) -> Vec<i32> {
-    let split = input.split("\n");
-    let mut sum: i32 = 0;
-    let mut sums = Vec::<i32>::new();
-    split.for_each(|i| {
-        if i == "" {
-            let pos = sums.binary_search(&sum).unwrap_or_else(|e| e);
-            sums.insert(pos, sum);
-            sum = 0;
-        } else {
-            sum += i.parse::<i32>().unwrap();
-        }
-    });
-    return sums;
+fn solve(input: String) -> Vec<u64> {
+    let groups = input
+        .lines()
+        .map(|v| v.parse::<u64>().ok())
+        .coalesce(|a, b| match (a, b) {
+            (None, None) => Ok(None),
+            (None, Some(b)) => Ok(Some(b)),
+            (Some(a), Some(b)) => Ok(Some(a + b)),
+            (Some(a), None) => Err((Some(a), None)),
+        })
+        .flatten()
+        .sorted_by_key(|&v| std::cmp::Reverse(v))
+        .collect_vec();
+
+    groups
 }
 
 #[cfg(test)]
@@ -46,7 +53,7 @@ mod tests {
         );
         assert_eq!(
             solve(input),
-            Vec::<i32>::from([4000, 6000, 10000, 11000, 24000])
+            Vec::<u64>::from([24000, 11000, 10000, 6000, 4000])
         );
     }
 }
