@@ -1,6 +1,8 @@
 use color_eyre::eyre::Context;
 
-fn main() {
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
     let solver = Solver {
         path: String::from("src/input.txt"),
     };
@@ -8,6 +10,8 @@ fn main() {
     println!("{solution}");
     let solution = solver.solve_pt2();
     println!("{solution}");
+
+    Ok(())
 }
 
 struct Solver {
