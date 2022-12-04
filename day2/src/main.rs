@@ -56,6 +56,13 @@ impl Config {
 }
 
 #[derive(Debug, Clone, Copy)]
+enum RoundResult {
+    Loss = 0,
+    Draw = 3,
+    Win  = 6,
+}
+
+#[derive(Debug, Clone, Copy)]
 enum Shape {
     Rock = 1,
     Paper,
@@ -72,18 +79,18 @@ struct Round {
 impl Round {
     fn play(&self) -> i32 {
         let result = match (self.my_choice, self.opp_choice) {
-            (Shape::Rock, Shape::Rock) => 3,
-            (Shape::Rock, Shape::Paper) => 0,
-            (Shape::Rock, Shape::Scissors) => 6,
-            (Shape::Paper, Shape::Rock) => 6,
-            (Shape::Paper, Shape::Paper) => 3,
-            (Shape::Paper, Shape::Scissors) => 0,
-            (Shape::Scissors, Shape::Rock) => 0,
-            (Shape::Scissors, Shape::Paper) => 6,
-            (Shape::Scissors, Shape::Scissors) => 3,
+            (Shape::Rock, Shape::Rock) => RoundResult::Draw,
+            (Shape::Rock, Shape::Paper) => RoundResult::Loss,
+            (Shape::Rock, Shape::Scissors) => RoundResult::Win,
+            (Shape::Paper, Shape::Rock) => RoundResult::Win,
+            (Shape::Paper, Shape::Paper) => RoundResult::Draw,
+            (Shape::Paper, Shape::Scissors) => RoundResult::Loss,
+            (Shape::Scissors, Shape::Rock) => RoundResult::Loss,
+            (Shape::Scissors, Shape::Paper) => RoundResult::Win,
+            (Shape::Scissors, Shape::Scissors) => RoundResult::Draw,
         };
 
-        result + self.my_choice as i32
+        result as i32 + self.my_choice as i32
     }
 }
 
