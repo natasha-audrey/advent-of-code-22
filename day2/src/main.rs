@@ -1,12 +1,16 @@
 use color_eyre::eyre::Context;
 
-fn main() {
-    let solution = Config {
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+    let cfg = Config {
         path: String::from("src/input.txt"),
-    }
-    .solve()
-    .unwrap();
-    println!("{solution}")
+    };
+    let pt1 = cfg.solve_pt1().unwrap();
+    let pt2 = cfg.solve_pt2().unwrap();
+    
+    println!("{pt1}\n{pt2}");
+
+    Ok(())
 }
 
 struct Config {
@@ -21,8 +25,7 @@ impl Config {
         Ok(input)
     }
 
-    pub fn solve(&self) -> color_eyre::Result<i32> {
-        color_eyre::install()?;
+    fn solve_pt1(&self) -> color_eyre::Result<i32> {
         let input = self.read_input().unwrap();
 
         let mut sum = 0;
@@ -30,13 +33,45 @@ impl Config {
         input.lines().for_each(|line| {
             let mut round = line.split(' ');
             let opp_choice = match round.next().unwrap() {
-                "A" => Ok(Shape::Rock),
-                "B" => Ok(Shape::Paper),
-                "C" => Ok(Shape::Scissors),
+                "A" => Ok(Move::Rock),
+                "B" => Ok(Move::Paper),
+                "C" => Ok(Move::Scissors),
                 _ => Err("invalid input"),
             }
             .unwrap();
-            let my_result = match round.next().unwrap() {
+            let my_choice = match round.next().unwrap() {
+                "X" => Ok(Move::Rock),
+                "Y" => Ok(Move::Paper),
+                "Z" => Ok(Move::Scissors),
+                _ => Err("invalid input"),
+            }
+            .unwrap();
+
+            let res = Round {
+                my_choice,
+                opp_choice,
+            };
+            sum += res.play();
+        });
+
+        Ok(sum)
+    }
+
+    fn solve_pt2(&self) -> color_eyre::Result<i32> {
+        let input = self.read_input().unwrap();
+
+        let mut sum = 0;
+
+        input.lines().for_each(|line| {
+            let mut round = line.split(' ');
+            let theirs = match round.next().unwrap() {
+                "A" => Ok(Move::Rock),
+                "B" => Ok(Move::Paper),
+                "C" => Ok(Move::Scissors),
+                _ => Err("invalid input"),
+            }
+            .unwrap();
+            let ours = match round.next().unwrap() {
                 "X" => Ok(RoundResult::Loss),
                 "Y" => Ok(RoundResult::Draw),
                 "Z" => Ok(RoundResult::Win),
@@ -44,11 +79,11 @@ impl Config {
             }
             .unwrap();
 
-            let res = Round {
-                my_result,
-                opp_choice,
-            };
-            sum += res.play();
+            let our_move = ours.matching_move(theirs);
+            sum += Round {
+                my_choice: our_move,
+                opp_choice: theirs,
+            }.play()
         });
 
         Ok(sum)
@@ -59,46 +94,86 @@ impl Config {
 enum RoundResult {
     Loss = 0,
     Draw = 3,
-    Win  = 6,
+    Win = 6,
+}
+
+impl RoundResult {
+    fn matching_move(self, theirs: Move) -> Move {
+        match self {
+            RoundResult::Loss => theirs.losing_move(),
+            RoundResult::Draw => theirs,
+            RoundResult::Win => theirs.winning_move(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Shape {
+enum Move {
     Rock = 1,
     Paper,
     Scissors,
 }
 
+impl Move {
+    const ALL_MOVES: [Move;3] = [Move::Rock, Move::Paper, Move::Scissors];
+
+    fn winning_move(self) -> Self {
+        Self::ALL_MOVES.iter().copied().find(|m| m.wins(self)).expect("at least one move beats us")
+    }
+
+    fn losing_move(self) -> Self {
+        Self::ALL_MOVES.iter().copied().find(|&m| self.wins(m)).expect("at least one move beats us")
+    }
+
+    fn wins(self, other: Move) -> bool {
+        matches!(
+            (self, other),
+            (Self::Rock, Self::Scissors)
+                | (Self::Paper, Self::Rock)
+                | (Self::Scissors, Self::Paper)
+        )
+    }
+
+    fn outcome(self, theirs: Move) -> RoundResult {
+        if self.wins(theirs) {
+            RoundResult::Win
+        } else if theirs.wins(self) {
+            RoundResult::Loss
+        } else {
+            RoundResult::Draw
+        }
+    }
+}
+
 #[derive(Debug)]
 
 struct Round {
-    my_result: RoundResult,
-    opp_choice: Shape,
+    my_choice: Move,
+    opp_choice: Move,
 }
 
 impl Round {
     fn play(&self) -> i32 {
-        let result = match (self.my_result, self.opp_choice) {
-            (RoundResult::Loss, Shape::Rock) => Shape::Scissors,
-            (RoundResult::Loss, Shape::Paper) => Shape::Rock,
-            (RoundResult::Loss, Shape::Scissors) => Shape::Paper,
-            (RoundResult::Draw, _) => self.opp_choice,
-            (RoundResult::Win, Shape::Rock) => Shape::Paper,
-            (RoundResult::Win, Shape::Paper) => Shape::Scissors,
-            (RoundResult::Win, Shape::Scissors) => Shape::Rock,
-        };
+        let result = self.my_choice.outcome(self.opp_choice);
 
-        result as i32 + self.my_result as i32
+        result as i32 + self.my_choice as i32
     }
-
 }
 
 mod tests {
     #[test]
-    fn is_solved() {
+    fn test_input() {
         let cfg = crate::Config {
             path: String::from("src/test.txt"),
         };
-        assert_eq!(cfg.solve().ok(), Some(12))
+        assert_eq!(cfg.solve_pt1().ok(), Some(15));
+        assert_eq!(cfg.solve_pt2().ok(), Some(12));
+    }
+    #[test]
+    fn given_input() {
+        let cfg = crate::Config {
+            path: String::from("src/input.txt"),
+        };
+        assert_eq!(cfg.solve_pt1().ok(), Some(13484));
     }
 }
