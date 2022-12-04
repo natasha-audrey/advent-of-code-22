@@ -36,16 +36,16 @@ impl Config {
                 _ => Err("invalid input"),
             }
             .unwrap();
-            let my_choice = match round.next().unwrap() {
-                "X" => Ok(Shape::Rock),
-                "Y" => Ok(Shape::Paper),
-                "Z" => Ok(Shape::Scissors),
+            let my_result = match round.next().unwrap() {
+                "X" => Ok(RoundResult::Loss),
+                "Y" => Ok(RoundResult::Draw),
+                "Z" => Ok(RoundResult::Win),
                 _ => Err("invalid input"),
             }
             .unwrap();
 
             let res = Round {
-                my_choice,
+                my_result,
                 opp_choice,
             };
             sum += res.play();
@@ -72,26 +72,25 @@ enum Shape {
 #[derive(Debug)]
 
 struct Round {
-    my_choice: Shape,
+    my_result: RoundResult,
     opp_choice: Shape,
 }
 
 impl Round {
     fn play(&self) -> i32 {
-        let result = match (self.my_choice, self.opp_choice) {
-            (Shape::Rock, Shape::Rock) => RoundResult::Draw,
-            (Shape::Rock, Shape::Paper) => RoundResult::Loss,
-            (Shape::Rock, Shape::Scissors) => RoundResult::Win,
-            (Shape::Paper, Shape::Rock) => RoundResult::Win,
-            (Shape::Paper, Shape::Paper) => RoundResult::Draw,
-            (Shape::Paper, Shape::Scissors) => RoundResult::Loss,
-            (Shape::Scissors, Shape::Rock) => RoundResult::Loss,
-            (Shape::Scissors, Shape::Paper) => RoundResult::Win,
-            (Shape::Scissors, Shape::Scissors) => RoundResult::Draw,
+        let result = match (self.my_result, self.opp_choice) {
+            (RoundResult::Loss, Shape::Rock) => Shape::Scissors,
+            (RoundResult::Loss, Shape::Paper) => Shape::Rock,
+            (RoundResult::Loss, Shape::Scissors) => Shape::Paper,
+            (RoundResult::Draw, _) => self.opp_choice,
+            (RoundResult::Win, Shape::Rock) => Shape::Paper,
+            (RoundResult::Win, Shape::Paper) => Shape::Scissors,
+            (RoundResult::Win, Shape::Scissors) => Shape::Rock,
         };
 
-        result as i32 + self.my_choice as i32
+        result as i32 + self.my_result as i32
     }
+
 }
 
 mod tests {
@@ -100,6 +99,6 @@ mod tests {
         let cfg = crate::Config {
             path: String::from("src/test.txt"),
         };
-        assert_eq!(cfg.solve().ok(), Some(15))
+        assert_eq!(cfg.solve().ok(), Some(12))
     }
 }
