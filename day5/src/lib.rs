@@ -6,7 +6,8 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take},
     character::complete::digit1,
-    combinator::{all_consuming, map, map_res, opt},
+    combinator::{all_consuming, map, map_res},
+    multi::separated_list1,
     sequence::{delimited, preceded, tuple},
     Finish, IResult,
 };
@@ -161,19 +162,7 @@ impl Parser {
     }
 
     fn parse_crate_line(i: &str) -> IResult<&str, Vec<Option<Crate>>> {
-        let (mut i, c) = Self::parse_crate_option(i)?;
-        let mut v = vec![c];
-
-        loop {
-            let (next_i, maybe_c) = opt(preceded(tag(" "), Self::parse_crate_option))(i)?;
-            match maybe_c {
-                Some(c) => v.push(c),
-                None => break,
-            }
-            i = next_i;
-        }
-
-        Ok((i, v))
+        separated_list1(tag(" "), Self::parse_crate_option)(i)
     }
 
     pub fn solve_pt1(self) -> String {
@@ -210,7 +199,8 @@ impl Parser {
         let input = self.read_input().unwrap();
         let mut lines = input.lines();
 
-        let crate_lines: Vec<Vec<Option<Crate>>> = (&mut lines)
+        let crate_lines: Vec<Vec<Option<Crate>>> = lines
+            .by_ref()
             .map_while(|line| {
                 all_consuming(Self::parse_crate_line)(line)
                     .finish()
