@@ -1,6 +1,6 @@
 fn main() {
-    let solver = day5::Solver {
-        path: String::from("src/input.txt"),
+    let solver = day5::Parser {
+        path: String::from("src/test.txt"),
     };
     println!("{}", solver.solve_pt1());
 }

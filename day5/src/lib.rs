@@ -1,7 +1,6 @@
 use std::fmt;
 
 use color_eyre::eyre::Context;
-
 use itertools::Itertools;
 use nom::{
     branch::alt,
@@ -14,12 +13,18 @@ use nom::{
 
 /// # Test Input
 /// ```
-/// let solver = day5::Solver {
+/// let parser = day5::Parser {
 ///   path: String::from("src/test.txt"),
 /// };
-/// assert_eq!(solver.solve_pt1(), "CMZ");
+/// assert_eq!(parser.solve_pt1(), "CMZ");
 /// ```
-pub struct Solver {
+/// ```
+/// let parser = day5::Parser {
+///   path: String::from("src/input.txt"),
+/// };
+/// assert_eq!(parser.solve_pt1(), "HBTMTBSDC");
+/// ```
+pub struct Parser {
     pub path: String,
 }
 
@@ -28,17 +33,6 @@ struct Instruction {
     quantity: usize,
     src: usize,
     dst: usize,
-}
-
-fn parse_instruction(i: &str) -> IResult<&str, Instruction> {
-    map(
-        tuple((
-            preceded(tag("move "), parse_number),
-            preceded(tag(" from "), parse_pile_number),
-            preceded(tag(" to "), parse_pile_number),
-        )),
-        |(quantity, src, dst)| Instruction { quantity, src, dst },
-    )(i)
 }
 
 #[derive(Clone, Copy)]
@@ -50,9 +44,14 @@ impl fmt::Debug for Crate {
     }
 }
 impl fmt::Display for Crate {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      fmt::Debug::fmt(self, f)
-  }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+impl Default for Crate {
+    fn default() -> Self {
+        Self('_')
+    }
 }
 
 struct Piles(Vec<Vec<Crate>>);
@@ -62,106 +61,124 @@ impl fmt::Debug for Piles {
         for (i, pile) in self.0.iter().enumerate() {
             writeln!(f, "Pile {}: {:?}", i, pile)?;
         }
+        writeln!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(|pile| pile.last().copied().unwrap_or_default())
+                .join("")
+        )?;
         Ok(())
     }
 }
 
 impl Piles {
+    fn from(v: Vec<Vec<Option<Crate>>>) -> Self {
+        let len = v[0].len();
+        let mut iters: Vec<_> = v.into_iter().map(|n| n.into_iter()).collect();
+        Self(
+            (0..len)
+                .map(|_| {
+                    iters
+                        .iter_mut()
+                        .rev()
+                        .filter_map(|n| n.next().unwrap())
+                        .collect::<Vec<Crate>>()
+                })
+                .collect(),
+        )
+    }
+
     fn apply(&mut self, ins: Instruction) {
+        println!("applying {ins:?}\nbefore: {self:?}");
         for _ in 0..ins.quantity {
             let el = self.0[ins.src].pop().unwrap();
             self.0[ins.dst].push(el);
         }
+        println!("after: {self:?}");
     }
 }
 
-fn parse_crate(i: &str) -> IResult<&str, Crate> {
-    let first_char = |s: &str| Crate(s.chars().next().unwrap());
-    let f = delimited(tag("["), take(1_usize), tag("]"));
-    map(f, first_char)(i)
-}
+impl Parser {
+    pub fn read_input(&self) -> color_eyre::Result<String> {
+        let input = std::fs::read_to_string(self.path.as_str())
+            .wrap_err(format!("reading {}", self.path))?;
 
-fn parse_hole(i: &str) -> IResult<&str, ()> {
-    // `drop` takes a value and returns nothing, which is
-    // perfect for our case
-    map(tag("   "), drop)(i)
-}
+        Ok(input)
+    }
 
-fn parse_crate_or_hole(i: &str) -> IResult<&str, Option<Crate>> {
-    alt((map(parse_crate, Some), map(parse_hole, |_| None)))(i)
-}
-
-fn parse_number(i: &str) -> IResult<&str, usize> {
-    map_res(digit1, |s: &str| s.parse::<usize>())(i)
-}
-
-fn parse_pile_number(i: &str) -> IResult<&str, usize> {
-    map(parse_number, |i| i - 1)(i)
-}
-
-fn parse_crate_line(i: &str) -> IResult<&str, Vec<Option<Crate>>> {
-    let (mut i, c) = parse_crate_or_hole(i)?;
-    let mut v = vec![c];
-
-    loop {
-        let (next_i, maybe_c) = opt(preceded(tag(" "), parse_crate_or_hole))(i)?;
-        match maybe_c {
-            Some(c) => v.push(c),
-            None => break,
+    fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
+        fn parse_number(i: &str) -> IResult<&str, usize> {
+            map_res(digit1, |s: &str| s.parse::<usize>())(i)
         }
-        i = next_i;
+        map(
+            tuple((
+                preceded(tag("move "), parse_number),
+                preceded(tag(" from "), parse_number),
+                preceded(tag(" to "), parse_number),
+            )),
+            |(quantity, src, dst)| Instruction {
+                quantity,
+                src: src - 1,
+                dst: dst - 1,
+            },
+        )(input)
     }
 
-    Ok((i, v))
-}
+    fn parse_crate(input: &str) -> IResult<&str, Crate> {
+        let first_char = |s: &str| Crate(s.chars().next().unwrap());
+        let f = delimited(tag("["), take(1_usize), tag("]"));
+        map(f, first_char)(input)
+    }
 
-fn transpose<T>(v: Vec<Vec<Option<T>>>) -> Vec<Vec<T>> {
-    assert!(!v.is_empty());
-    let len = v[0].len();
-    let mut iters: Vec<_> = v.into_iter().map(|n| n.into_iter()).collect();
-    (0..len)
-        .map(|_| {
-            iters
-                .iter_mut()
-                .rev()
-                .filter_map(|n| n.next().unwrap())
-                .collect::<Vec<T>>()
-        })
-        .collect()
-}
+    fn parse_crate_option(input: &str) -> IResult<&str, Option<Crate>> {
+        alt((map(Self::parse_crate, Some), map(tag("   "), |_| None)))(input)
+    }
 
-impl Solver {
-  pub fn read_input(&self) -> color_eyre::Result<String> {
-    let input = std::fs::read_to_string(self.path.as_str())
-        .wrap_err(format!("reading {}", self.path))?;
+    fn parse_crate_line(i: &str) -> IResult<&str, Vec<Option<Crate>>> {
+        let (mut i, c) = Self::parse_crate_option(i)?;
+        let mut v = vec![c];
 
-    Ok(input)
-}
+        loop {
+            let (next_i, maybe_c) = opt(preceded(tag(" "), Self::parse_crate_option))(i)?;
+            match maybe_c {
+                Some(c) => v.push(c),
+                None => break,
+            }
+            i = next_i;
+        }
 
+        Ok((i, v))
+    }
 
     pub fn solve_pt1(self) -> String {
         let input = self.read_input().unwrap();
         let mut lines = input.lines();
 
-        let crate_lines: Vec<_> = (&mut lines)
+        let crate_lines: Vec<Vec<Option<Crate>>> = (&mut lines)
             .map_while(|line| {
-                all_consuming(parse_crate_line)(line)
+                all_consuming(Self::parse_crate_line)(line)
                     .finish()
                     .ok()
                     .map(|(_, line)| line)
             })
             .collect();
-        let mut piles = Piles(transpose(crate_lines));
-        println!("{piles:?}");
+        let mut piles = Piles::from(crate_lines);
 
-        // we've consumed the "numbers line" but not the separating line
-        assert!(lines.next().unwrap().is_empty());
+        let instructions = lines.filter(|x| !x.is_empty()).map(|inst| {
+            let (_, i) = Self::parse_instruction(inst).unwrap();
+            i
+        });
 
-        for ins in lines.map(|line| all_consuming(parse_instruction)(line).finish().unwrap().1) {
+        for ins in instructions {
             piles.apply(ins);
-            println!("{piles:?}");
         }
 
-        piles.0.iter().map(|pile| pile.last().unwrap()).join("")
+        piles
+            .0
+            .iter()
+            .map(|pile| pile.last().copied().unwrap_or_default())
+            .join("")
     }
 }
