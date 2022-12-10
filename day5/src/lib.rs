@@ -20,9 +20,21 @@ use nom::{
 /// ```
 /// ```
 /// let parser = day5::Parser {
+///   path: String::from("src/test.txt"),
+/// };
+/// assert_eq!(parser.solve_pt2(), "MCD");
+/// ```
+/// ```
+/// let parser = day5::Parser {
 ///   path: String::from("src/input.txt"),
 /// };
 /// assert_eq!(parser.solve_pt1(), "HBTMTBSDC");
+/// ```
+/// ```
+/// let parser = day5::Parser {
+///   path: String::from("src/input.txt"),
+/// };
+/// assert_eq!(parser.solve_pt2(), "PQTJRSHWS");
 /// ```
 pub struct Parser {
     pub path: String,
@@ -96,6 +108,18 @@ impl Piles {
             let el = self.0[ins.src].pop().unwrap();
             self.0[ins.dst].push(el);
         }
+        println!("after: {self:?}");
+    }
+
+    fn apply_v2(&mut self, ins: Instruction) {
+        println!("applying {ins:?}\nbefore: {self:?}");
+        let mut a: Vec<Crate> = Vec::new();
+        for _ in 0..ins.quantity {
+            let el = self.0[ins.src].pop().unwrap();
+            a.push(el);
+        }
+        a.reverse();
+        self.0[ins.dst].extend(a.iter());
         println!("after: {self:?}");
     }
 }
@@ -173,6 +197,36 @@ impl Parser {
 
         for ins in instructions {
             piles.apply(ins);
+        }
+
+        piles
+            .0
+            .iter()
+            .map(|pile| pile.last().copied().unwrap_or_default())
+            .join("")
+    }
+
+    pub fn solve_pt2(self) -> String {
+        let input = self.read_input().unwrap();
+        let mut lines = input.lines();
+
+        let crate_lines: Vec<Vec<Option<Crate>>> = (&mut lines)
+            .map_while(|line| {
+                all_consuming(Self::parse_crate_line)(line)
+                    .finish()
+                    .ok()
+                    .map(|(_, line)| line)
+            })
+            .collect();
+        let mut piles = Piles::from(crate_lines);
+
+        let instructions = lines.filter(|x| !x.is_empty()).map(|inst| {
+            let (_, i) = Self::parse_instruction(inst).unwrap();
+            i
+        });
+
+        for ins in instructions {
+            piles.apply_v2(ins);
         }
 
         piles
